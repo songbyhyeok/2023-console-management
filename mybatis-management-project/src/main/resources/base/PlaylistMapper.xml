@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="base.PlaylistMapper">
+
+    <!-- 조회한 컬럼과 DTO를 매핑시키기 위한 설정이다. -->
+
+    <resultMap id="memberResultMap" type="base.dto.MemberDTO">
+        <id property="code" column="MEMBER_NO"/>
+        <result property="name" column="MEMBER_NAME"/>
+        <result property="nickname" column="MEMBER_NICKNAME"/>
+    </resultMap>
+
+    <resultMap id="roomResultMap" type="base.dto.RoomDTO">
+        <id property="code" column="ROOM_NO"/>
+        <result property="title" column="ROOM_TITLE"/>
+        <result property="description" column="ROOM_DESCRIPTION"/>
+        <association property="member" resultMap="memberResultMap"/>
+    </resultMap>
+
+    <resultMap id="musicResultMap" type="base.dto.MusicDTO">
+        <id property="code" column="MUSIC_NO"/>
+        <result property="title" column="MUSIC_TITLE"/>
+        <result property="artist" column="MUSIC_ARTIST"/>
+        <result property="album" column="MUSIC_ALBUM"/>
+        <result property="composer" column="MUSIC_COMPOSER"/>
+    </resultMap>
+
+    <resultMap id="playlistResultMap" type="base.dto.PlaylistDTO">
+        <association property="room" resultMap="roomResultMap"/>
+        <collection property="musicList" resultMap="musicResultMap"/>
+    </resultMap>
+
+    <select id="selectAllPlaylist" parameterType="hashmap" resultMap="playlistResultMap">
+        SELECT
+            P.ROOM_NO,
+            P.MUSIC_NO,
+            S.MUSIC_NO,
+            R.ROOM_NO,
+            R.ROOM_TITLE,
+            R.ROOM_DESCRIPTION,
+            M.MEMBER_NO,
+            M.MEMBER_NAME,
+            M.MEMBER_NICKNAME,
+            R.MEMBER_NO,
+            S.MUSIC_TITLE,
+            S.MUSIC_ARTIST,
+            S.MUSIC_ALBUM,
+            S.MUSIC_COMPOSER
+        FROM
+            PLAYLIST P
+        JOIN
+            ROOM R ON (P.ROOM_NO = R.ROOM_NO)
+        JOIN
+            MEMBER M ON (R.MEMBER_NO = M.MEMBER_NO)
+        JOIN
+            MUSIC S ON (P.MUSIC_NO = S.MUSIC_NO)
+
+        <where>
+            <!-- 재생목록 번호 기준 -->
+            <if test="roomCode != null">
+                P.ROOM_NO = #{ roomCode }
+            </if>
+            <if test="conditionN == 1">
+                AND S.MUSIC_ARTIST LIKE '%' || #{ musicInfo } || '%'
+            </if>
+            <if test="conditionN == 2">
+                AND S.MUSIC_TITLE LIKE '%' || #{ musicInfo } || '%'
+            </if>
+
+            <!-- 회원명 기준 -->
+            <if test="memberName != null and memberName != ''">
+                M.MEMBER_NAME LIKE '%' || #{ memberName } || '%'
+            </if>
+            <if test="roomMode == 1">
+                AND P.ROOM_NO BETWEEN #{ minVal } AND #{ maxVal }
+            </if>
+            <if test="roomMode == 2">
+                AND P.ROOM_NO = #{ roomMode }
+            </if>
+
+            <!-- 음악 제목 기준 -->
+            <if test="musicTitle != null">
+                S.MUSIC_TITLE LIKE '%' || #{ musicTitle } || '%'
+            </if>
+            <if test="memberName2 != null and memberName2 != ''">
+                AND M.MEMBER_NAME LIKE '%' || #{ memberName2 } || '%'
+            </if>
+        </where>
+
+        ORDER BY P.ROOM_NO ASC
+    </select>
+
+    <select id="selectAllRoom" resultMap="roomResultMap">
+        SELECT
+            R.ROOM_NO,
+            R.ROOM_TITLE,
+            R.ROOM_DESCRIPTION,
+            R.MEMBER_NO,
+            M.MEMBER_NO,
+            M.MEMBER_NAME,
+            M.MEMBER_NICKNAME
+        FROM
+            ROOM R
+        JOIN
+            MEMBER M ON (R.MEMBER_NO = M.MEMBER_NO)
+    </select>
+
+    <select id="selectRoomByCode" resultMap="roomResultMap">
+        SELECT
+            R.ROOM_NO,
+            R.ROOM_TITLE,
+            R.ROOM_DESCRIPTION,
+            R.MEMBER_NO,
+            M.MEMBER_NO,
+            M.MEMBER_NAME,
+            M.MEMBER_NICKNAME
+        FROM
+            ROOM R
+        JOIN
+            MEMBER M ON (R.MEMBER_NO = M.MEMBER_NO)
+        WHERE
+            R.ROOM_NO = #{ code }
+    </select>
+
+    <select id="selectAllMember" resultMap="memberResultMap">
+        SELECT
+            MEMBER_NO,
+            MEMBER_NAME,
+            MEMBER_NICKNAME
+        FROM
+            MEMBER
+    </select>
+
+    <select id="selectMemberByCode" parameterType="_int" resultMap="memberResultMap">
+        SELECT
+            MEMBER_NO,
+            MEMBER_NAME,
+            MEMBER_NICKNAME
+        FROM
+            MEMBER
+        WHERE
+            MEMBER_NO = #{ code }
+    </select>
+
+    <select id="selectAllMusic" resultMap="musicResultMap">
+        SELECT
+            MUSIC_NO,
+            MUSIC_TITLE,
+            MUSIC_ARTIST,
+            MUSIC_ALBUM,
+            MUSIC_COMPOSER
+        FROM
+            MUSIC
+    </select>
+
+    <select id="selectMusicByCode" parameterType="_int" resultMap="musicResultMap">
+        SELECT
+            MUSIC_NO,
+            MUSIC_TITLE,
+            MUSIC_ARTIST,
+            MUSIC_ALBUM,
+            MUSIC_COMPOSER
+        FROM
+            MUSIC
+        WHERE
+            MUSIC_NO = #{ code }
+    </select>
+
+    <!--
+    insert, update, delete의 경우 resultType은 작성하지 않고, 기본적으로 _int 로 수행 결과를 반환한다.
+    파라미터로 전달 된 DTO의 필드명으로 값을 바인딩 해야 하며, getter를 내부적으로 이용하므로 getter가 없으면 에러가 발생한다.
+    -->
+    <insert id="insertPlaylist" parameterType="base.dto.PlaylistDTO">
+        INSERT
+        INTO PLAYLIST (
+            PLAYLIST_NO,
+            PLAYLIST_TITLE,
+            PLAYLIST_DESCRIPTION,
+            PLAYLIST_ORDER,
+            MEMBER_NO
+        )
+        VALUES (
+            SEQ_PLAYLIST_CODE.NEXTVAL,
+            #{ title },
+            #{ description },
+            SEQ_PLAYLIST_CODE.CURRVAL,
+            -1
+        )
+    </insert>
+
+    <insert id="insertRoom" parameterType="base.dto.RoomDTO">
+        INSERT
+        INTO ROOM (
+            ROOM_NO,
+            ROOM_TITLE,
+            ROOM_DESCRIPTION,
+            MEMBER_NO
+        )
+        VALUES (
+            SEQ_PLAYLIST_CODE.NEXTVAL,
+            #{ title },
+            #{ description },
+            #{ memberCode }
+        )
+    </insert>
+
+    <insert id="insertMember" parameterType="base.dto.MemberDTO">
+        INSERT
+        INTO MEMBER (
+            MEMBER_NO,
+            MEMBER_NAME,
+            MEMBER_NICKNAME
+        )
+        VALUES (
+            SEQ_MEMBER_CODE.NEXTVAL,
+            #{ name },
+            #{ nickname }
+        )
+    </insert>
+
+    <insert id="insertMusic" parameterType="base.dto.MusicDTO">
+        INSERT
+        INTO MUSIC (
+            MUSIC_NO,
+            MUSIC_TITLE,
+            MUSIC_ARTIST,
+            MUSIC_ALBUM,
+            MUSIC_COMPOSER
+        )
+        VALUES (
+            SEQ_MUSIC_CODE.NEXTVAL,
+            #{ title },
+            #{ artist },
+            #{ album },
+            #{ composer }
+        )
+    </insert>
+
+    <update id="updatePlaylist" parameterType="base.dto.PlaylistDTO">
+        UPDATE
+            PLAYLIST
+        SET
+            PLAYLIST_TITLE = #{ title },
+            PLAYLIST_DESCRIPTION = #{ description }
+        WHERE
+            PLAYLIST_NO = #{ code }
+    </update>
+
+    <update id="updateRoom" parameterType="base.dto.RoomDTO">
+        UPDATE
+            ROOM
+        SET
+            ROOM_TITLE = #{ title },
+            ROOM_DESCRIPTION = #{ description }
+        WHERE
+            ROOM_NO = #{ code }
+    </update>
+
+    <update id="updateMember" parameterType="base.dto.MemberDTO">
+        UPDATE
+            MEMBER
+        SET
+            MEMBER_NAME = #{ name },
+            MEMBER_NICKNAME = #{ nickname }
+        WHERE
+            MEMBER_NO = #{ code }
+    </update>
+
+    <update id="updateMusic" parameterType="base.dto.MusicDTO">
+        UPDATE
+            MUSIC
+        SET
+            MUSIC_TITLE = #{ title },
+            MUSIC_ARTIST = #{ artist },
+            MUSIC_ALBUM = #{ album },
+            MUSIC_COMPOSER = #{ composer }
+        WHERE
+            MUSIC_NO = #{ code }
+    </update>
+
+    <delete id="deletePlaylist" parameterType="_int">
+        DELETE
+        FROM
+            PLAYLIST
+        WHERE
+            PLAYLIST_NO = #{ code }
+    </delete>
+
+    <delete id="deleteRoom" parameterType="_int">
+        DELETE
+        FROM
+            ROOM
+        WHERE
+            ROOM_NO = #{ code }
+    </delete>
+
+    <delete id="deleteMember" parameterType="_int">
+        DELETE
+        FROM
+            MEMBER
+        WHERE
+            MEMBER_NO = #{ code }
+    </delete>
+
+    <delete id="deleteMusic" parameterType="_int">
+        DELETE
+        FROM
+            MUSIC
+        WHERE
+            MUSIC_NO = #{ code }
+    </delete>
+
+</mapper>
